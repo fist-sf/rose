@@ -617,64 +617,39 @@ im.onload = function(){ cutout(this); buildParticles(this); buildRoseParts(); };
 im.src = CAT_IMG;
 requestAnimationFrame(loop);
 </script>
+<audio id="bgm" src="music.mp3" loop preload="auto" playsinline></audio>
 <script>
-/* ---- 配乐：八音盒（Web Audio 合成；进页面就试着自动放，被拦了就等第一次点） ---- */
+/* ---- 配乐：《你瞒我瞒》 ---- */
 (function(){
-  var ac=null, started=false, muted=false, playing=false, hint=null;
-  function f(n){ return 440*Math.pow(2,(n-69)/12); }
-  var PROG=[[60,64,67,72],[55,59,62,67],[57,60,64,69],[53,57,60,65]];
-  var step=0;
-  function note(midi,when,dur,vol){
-    var o=ac.createOscillator(), g=ac.createGain();
-    o.type='triangle'; o.frequency.value=f(midi);
-    g.gain.setValueAtTime(0,when);
-    g.gain.linearRampToValueAtTime(vol,when+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0008,when+dur);
-    o.connect(g); g.connect(ac.destination);
-    o.start(when); o.stop(when+dur+0.05);
-  }
-  function bar(){
-    if(!ac||muted){ setTimeout(bar,600); return; }
-    if(ac.state!=='running'){ setTimeout(bar,400); return; }
-    var t=ac.currentTime+0.05, ch=PROG[step%PROG.length];
-    for(var i=0;i<4;i++) note(ch[i%ch.length], t+i*0.42, 1.5, 0.085);
-    note(ch[0]-12, t, 2.6, 0.05);
-    note(ch[2]+12, t+0.84, 2.0, 0.055);
-    step++; setTimeout(bar, 2100);
-  }
-  function hideHint(){ if(hint){ hint.style.opacity=0; } }
-  function showHint(){
+  var a=document.getElementById('bgm'), muted=false, hint=null;
+  function hide(){ if(hint) hint.style.opacity=0; }
+  function show(){
     if(hint||muted) return;
     hint=document.createElement('div');
     hint.textContent='\u70b9\u4e00\u4e0b\u5c4f\u5e55 \u00b7 \u97f3\u4e50\u54cd\u8d77';
-    hint.style.cssText='position:fixed;left:0;right:0;top:12px;text-align:center;z-index:21;color:#ffd7ea;font:13px/1.4 sans-serif;letter-spacing:2px;text-shadow:0 0 14px rgba(255,110,180,.9);transition:opacity .6s';
+    hint.style.cssText='position:fixed;left:0;right:0;top:12px;text-align:center;z-index:23;color:#ffd7ea;font:13px/1.4 sans-serif;letter-spacing:2px;text-shadow:0 0 14px rgba(255,110,180,.9);transition:opacity .6s';
     document.body.appendChild(hint);
   }
-  function resumeAndPlay(){
-    if(!ac) return;
-    try{ var p=ac.resume(); if(p&&p.then) p.then(hideHint).catch(function(){}); }catch(e){}
-    if(ac.state==='running') hideHint();
-    if(!playing){ playing=true; bar(); }
+  function tryPlay(){
+    if(!a||muted) return;
+    var p=a.play();
+    if(p&&p.then){ p.then(hide).catch(show); } else { hide(); }
   }
-  function start(){ if(started) return; started=true; try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; } resumeAndPlay(); }
-  /* ① 页面加载就立刻试一次自动播放 */
   window.addEventListener('load', function(){
-    start();
-    setTimeout(function(){ if(!ac || ac.state!=='running') showHint(); }, 700);
+    a.volume=0.8;
+    tryPlay();
+    setTimeout(function(){ if(a.paused) show(); }, 900);
   });
-  /* ② 任何一次交互（点/摸/滑/按键）都恢复播放 */
-  ['pointerdown','touchstart','touchend','click','keydown','wheel'].forEach(function(ev){
-    document.addEventListener(ev, function(){ start(); resumeAndPlay(); }, true);
+  ['pointerdown','touchstart','touchend','click','keydown'].forEach(function(ev){
+    document.addEventListener(ev, function(){ tryPlay(); }, true);
   });
-  /* ③ 开关 */
   var b=document.createElement('div');
   b.textContent='ON';
   b.style.cssText='position:fixed;right:10px;top:10px;z-index:22;color:#ffd7ea;font:12px/1.2 sans-serif;padding:6px 10px;border:1px solid rgba(255,200,230,.45);border-radius:14px;background:rgba(0,0,0,.28)';
   b.addEventListener('click', function(ev){
     ev.stopPropagation(); muted=!muted;
-    if(ac){ try{ muted?ac.suspend():ac.resume(); }catch(e){} }
+    if(muted){ a.pause(); } else { tryPlay(); }
     b.textContent = muted ? 'OFF' : 'ON';
-    if(!muted){ hideHint(); resumeAndPlay(); }
   }, true);
   document.body.appendChild(b);
 })();
