@@ -358,7 +358,7 @@ function drawBlink(cx, cy, k){
 }
 
 function draw(now){
-  if(now - last < 30) return;
+  if(now - last < 41) return;
   last = now;
   const T = ((now - t0)/1000) % 18.6;          /* 17 秒一轮 */
   const ringY = H*0.80;
