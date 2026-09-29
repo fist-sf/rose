@@ -619,9 +619,14 @@ requestAnimationFrame(loop);
 </script>
 <audio id="bgm" src="music.mp3" loop preload="auto" playsinline></audio>
 <script>
-/* ---- 配乐：《你瞒我瞒》 ---- */
+/* ---- 配乐：原曲 + 可切换的合成八音盒 ---- */
 (function(){
-  var a=document.getElementById('bgm'), muted=false, hint=null;
+  var a=document.getElementById('bgm'), muted=false, hint=null, mode='song';
+  var ac=null, started=false, playing=false, step=0;
+  function f(n){ return 440*Math.pow(2,(n-69)/12); }
+  var CH=[[60,64,67],[59,62,67],[57,60,64],[53,57,60]];
+  var MEL=[84,79,76,72, 83,79,74,71, 81,76,72,69, 77,72,69,65, 84,81,79,76, 83,79,76,72, 81,79,76,72, 74,72,69,67];
+  var mi=0;
   function hide(){ if(hint) hint.style.opacity=0; }
   function show(){
     if(hint||muted) return;
@@ -630,28 +635,66 @@ requestAnimationFrame(loop);
     hint.style.cssText='position:fixed;left:0;right:0;top:12px;text-align:center;z-index:23;color:#ffd7ea;font:13px/1.4 sans-serif;letter-spacing:2px;text-shadow:0 0 14px rgba(255,110,180,.9);transition:opacity .6s';
     document.body.appendChild(hint);
   }
-  function tryPlay(){
-    if(!a||muted) return;
-    var p=a.play();
-    if(p&&p.then){ p.then(hide).catch(show); } else { hide(); }
+  function tone(midi,when,dur,vol,type){
+    var o=ac.createOscillator(), g=ac.createGain();
+    o.type=type||'triangle'; o.frequency.value=f(midi);
+    g.gain.setValueAtTime(0,when);
+    g.gain.linearRampToValueAtTime(vol,when+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0008,when+dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(when); o.stop(when+dur+0.06);
   }
-  window.addEventListener('load', function(){
-    a.volume=0.8;
-    tryPlay();
-    setTimeout(function(){ if(a.paused) show(); }, 900);
-  });
+  function bar8(){
+    if(!ac||mode!=='box'||muted){ setTimeout(bar8,500); return; }
+    if(ac.state!=='running'){ setTimeout(bar8,400); return; }
+    var t=ac.currentTime+0.05, ch=CH[step%CH.length];
+    for(var i=0;i<3;i++) tone(ch[i], t+i*0.30, 1.4, 0.055, 'sine');
+    tone(ch[0]-12, t, 2.0, 0.045, 'sine');
+    for(var k2=0;k2<4;k2++){ tone(MEL[(mi+k2)%MEL.length], t+k2*0.30, 1.1, 0.070, 'triangle'); }
+    mi+=4; step++; setTimeout(bar8, 1280);
+  }
+  function startBox(){
+    if(mode!=='box') return;
+    if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; } }
+    try{ var p=ac.resume(); if(p&&p.then) p.then(hide); }catch(e){}
+    if(!playing){ playing=true; bar8(); }
+  }
+  function tryPlay(){
+    if(muted) return;
+    if(mode==='song'){
+      if(!a) return;
+      a.volume=0.85;
+      var p=a.play();
+      if(p&&p.then) p.then(hide).catch(show); else hide();
+    } else { startBox(); }
+  }
+  window.addEventListener('load', function(){ tryPlay(); setTimeout(function(){ if(mode==='song'&&a.paused) show(); }, 900); });
   ['pointerdown','touchstart','touchend','click','keydown'].forEach(function(ev){
     document.addEventListener(ev, function(){ tryPlay(); }, true);
   });
+  /* 开关 */
   var b=document.createElement('div');
   b.textContent='ON';
   b.style.cssText='position:fixed;right:10px;top:10px;z-index:22;color:#ffd7ea;font:12px/1.2 sans-serif;padding:6px 10px;border:1px solid rgba(255,200,230,.45);border-radius:14px;background:rgba(0,0,0,.28)';
   b.addEventListener('click', function(ev){
     ev.stopPropagation(); muted=!muted;
-    if(muted){ a.pause(); } else { tryPlay(); }
+    if(muted){ try{a.pause();}catch(e){} if(ac){ try{ac.suspend();}catch(e){} } }
+    else { if(mode==='box'){ try{ac&&ac.resume();}catch(e){} } tryPlay(); }
     b.textContent = muted ? 'OFF' : 'ON';
   }, true);
   document.body.appendChild(b);
+  /* 切换：原曲 / 八音盒 */
+  var s=document.createElement('div');
+  s.textContent='\u5207\u6362';
+  s.style.cssText='position:fixed;right:10px;top:44px;z-index:22;color:#ffd7ea;font:12px/1.2 sans-serif;padding:6px 10px;border:1px solid rgba(255,200,230,.45);border-radius:14px;background:rgba(0,0,0,.28)';
+  s.addEventListener('click', function(ev){
+    ev.stopPropagation();
+    mode = (mode==='song' ? 'box' : 'song');
+    if(mode==='box'){ try{a.pause();}catch(e){} startBox(); }
+    else { if(ac){ try{ac.suspend();}catch(e){} } tryPlay(); }
+    s.textContent = (mode==='box' ? '\u516b\u97f3\u76d2' : '\u539f\u66f2');
+  }, true);
+  document.body.appendChild(s);
 })();
 </script>
 </body>
